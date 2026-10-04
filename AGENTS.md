@@ -38,7 +38,7 @@ Engines: Node >= 24, npm >= 11.
 
 ## Agent behavior
 
-- **Ask questions** when ambiguous or before destructive actions. Ask one question at a time. An earlier answer can change what the remaining questions should be.
+- **Ask questions** when ambiguous or before destructive actions. Always ask one question at a time, because one question answer can effect next questions and its answers. An earlier answer can change what the remaining questions should be.
 - **Use your full toolkit**: Reach for `websearch`, `webfetch`, and any other available tools whenever they improve correctness. Do not answer from memory what a live tool can verify. Use `rg` (ripgrep) for file and content searches in the shell when it is installed.
 - **Decisions between options**: When a choice exists, evaluate all options first, pick the best one, then ask the user with every option listed (chosen one included and marked) before proceeding. Never silently pick one.
 - **Update this file** when you discover non-obvious gotchas, fixes, or conventions.
@@ -60,18 +60,26 @@ Engines: Node >= 24, npm >= 11.
 ```
 src/
   app/              # App Router (layout.tsx, page.tsx, globals.css)
+  app/(public)/     # Public group with centered Card layout: login/page.tsx, register/page.tsx
+  app/(private)/    # Private group with session guard layout: dashboard/page.tsx
+  app/api/auth/[...all]/  # BetterAuth route handler
   components/
     Layout/         # Header, ThemeToggleButton
     Providers/      # ThemeProvider (next-themes)
-    shadcnui/       # shadcn primitives (button.tsx, toast.tsx)
+    Form/           # LoginForm, RegisterForm (react-hook-form plus zod, server actions)
+    shadcnui/       # shadcn primitives (button, toast, card, input, field, label, separator)
   hooks/            # Custom hooks (currently empty)
   lib/
+    auth.ts         # BetterAuth server with prismaAdapter sqlite, nextCookies, Argon2id
+    auth-client.ts  # BetterAuth React client
+    password.ts     # Argon2id hash and verify via node-rs
+    zodSchema.ts    # loginFormSchema, registerFormSchema plus inferred types
     dbClient/       # Prisma singleton with libSQL adapter
     env/            # serverEnv.ts, clientEnv.ts (t3-env)
     fonts.ts        # next/font (Geist, Inter)
     types.ts        # LayoutProps
     utils.ts        # cn() helper (clsx + tailwind-merge)
-  server/           # API routes placeholder (empty)
+  server/           # Server actions: actions/auth.ts login, register, logout
 generated/prisma/   # Prisma client output (gitignored)
 public/uploads/     # User uploads (all files ignored except .gitkeep)
 ```
@@ -83,6 +91,19 @@ public/uploads/     # User uploads (all files ignored except .gitkeep)
 ## Code style
 
 - **Functions**: Always use arrow functions (`const foo = () => {}`), never `function` declarations. Exception: `src/components/shadcnui/` keeps its generated style.
+- **Link as button**: When a link needs button styling, use Next `Link` with `buttonVariants` instead of nesting interactive elements. Example:
+  ```tsx
+  import Link from "next/link";
+  import { buttonVariants } from "@/components/shadcnui/button";
+
+  const Example = () => (
+    <Link
+      href="#"
+      className={buttonVariants({ variant: "secondary", size: "sm" })}>
+      Login
+    </Link>
+  );
+  ```
 - **No em dashes**: Never use em dashes in prose, comments, or docs. Use periods or commas instead. Also avoid parentheses, en dashes, and hyphens as dash substitutes.
 
 ## Key restrictions
