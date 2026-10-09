@@ -2,12 +2,314 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client"
-    output   = "../generated/prisma"
-    // Target runtime environment. Default: nodejs
-    // runtime  = "nodejs"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  // Target runtime environment. Default: nodejs
+  // runtime  = "nodejs"
 }
 
 datasource db {
-    provider = "sqlite"
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          String?   @default("user")
+  banned        Boolean?  @default(false)
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+
+  currency      String? @default("USD")
+  paymentMethod String? @default("whatsapp")
+
+  products        Product[]
+  ratings         Rating[]
+  cartItems       CartItem[]
+  paymentMethods  SellerPaymentMethod[]
+  buyerOrders     Order[]               @relation("BuyerOrders")
+  sellerOrders    Order[]               @relation("SellerOrders")
+  reports         Report[]
+  supportTickets  SupportTicket[]
+  disputes        Dispute[]
+  auditLogs       AuditLog[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+  category    String
+  categoryId  String?
+  categoryRef Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  status      String   @default("approved")
+  imageUrl    String?
+  badge       String?
+  listPrice   Float
+  salePrice   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  ratings     Rating[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  tags        ProductTag[]
+  reports     Report[]
+
+  @@index([sellerId])
+  @@index([category])
+  @@index([status])
+  @@map("product")
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  buyerId   String
+  buyer     User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stars     Int
+  comment   String?
+  hidden    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([buyerId, productId])
+  @@index([productId])
+  @@map("rating")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  buyerId   String
+  buyer     User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty       Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([buyerId, productId])
+  @@index([buyerId])
+  @@map("cart_item")
+}
+
+model SellerPaymentMethod {
+  id       String @id @default(cuid())
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  type     String
+  channel  String
+  label    String
+  details  String
+
+  @@index([sellerId])
+  @@map("seller_payment_method")
+}
+
+model CurrencyRate {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  perUsd    Float
+  updatedAt DateTime @updatedAt
+
+  @@map("currency_rate")
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  buyerId       String
+  buyer         User        @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId      String
+  seller        User        @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Cascade)
+  status        String      @default("pending")
+  currency      String      @default("USD")
+  paymentMethod String      @default("whatsapp")
+  advanceProof  String?
+  couponCode    String?
+  discountPct   Float     @default(0)
+  totalUsd      Float
+  createdAt     DateTime    @default(now())
+  items         OrderItem[]
+  disputes      Dispute[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@map("order")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  qty       Int
+  priceUsd  Float
+
+  @@index([orderId])
+  @@map("order_item")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  products  Product[]
+
+  @@map("category")
+}
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  products ProductTag[]
+
+  @@map("tag")
+}
+
+model ProductTag {
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tagId     String
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([productId, tagId])
+  @@map("product_tag")
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  buyerId   String
+  buyer     User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ratingId  String?
+  reason    String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@map("report")
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  buyerId   String
+  buyer     User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  subject   String
+  message   String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@map("support_ticket")
+}
+
+model Dispute {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  reason    String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@map("dispute")
+}
+
+model VisitLog {
+  id        String   @id @default(cuid())
+  ip        String
+  country   String   @default("Unknown")
+  vpn       Boolean  @default(false)
+  path      String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([country])
+  @@map("visit_log")
+}
+
+model Coupon {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  percent   Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("coupon")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  action    String
+  target    String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("audit_log")
 }

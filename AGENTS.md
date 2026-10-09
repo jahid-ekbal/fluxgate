@@ -1,8 +1,10 @@
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
-This version has breaking changes. APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
 
@@ -48,8 +50,8 @@ Engines: Node >= 24, npm >= 11.
 
 - **Primary**: `bun run lint`, eslint only. This is the default check.
 - **Heavy gates**: `bun lint:check` runs `next typegen`, `tsc --noEmit`, and `eslint`. `bun run build` runs `prisma generate && next build`. Use these only when requested or when playwright-cli testing fails, since the dev server already runs typegen and typechecks during browser verification.
-- **Browser**: Use `playwright-cli` for UI verification, via `bunx playwright-cli` if it is not installed. Enumerate capabilities with `playwright-cli --help`.
-- **Headed mode**: Always run visible with `--headed`, e.g. `playwright-cli open --headed ...`.
+- **Browser**: Use `playwright-cli` for UI verification, via `bunx playwright-cli` if it is not installed. Run `playwright-cli --help` first to see all available commands.
+- **Headed mode**: Always run visible with `--headed`, e.g. `playwright-cli open --headed ...`. Never verify headless.
 - **Look at the page**: The agent has vision. Use `playwright-cli screenshot` and actually inspect layout, badges, dialogs, and styling. Do not rely on accessibility snapshots alone.
 - **Click-testing**: Prefer CLI-driven click-testing against the running dev server.
 - **Artifacts**: Snapshots, console logs, and screenshots land in `.playwright-cli/`, which is gitignored.
@@ -59,19 +61,43 @@ Engines: Node >= 24, npm >= 11.
 
 ```
 src/
-  app/              # App Router (layout.tsx, page.tsx, globals.css)
+  app/              # App Router (layout.tsx, page.tsx, globals.css, loading.tsx, error.tsx, not-found.tsx)
+    (public)/       # Public group, split-screen Fluxgate brand panel, redirects logged-in users to role home
+      sign-in/      # Sign-in page with SignInForm
+      sign-up/      # Sign-up page with SignUpForm
+    (private)/      # Private group, requires session, full width pages
+      browse/       # Product catalog with filters, cart, ratings, reports, tickets, my orders
+      seller/       # Seller dashboard, products, orders, payments, ratings
+      settings/     # Currency plus payment preferences
+      profile/      # Full profile for every role, avatar URL, stats, orders, ratings
+      admin/        # Menu button layout plus overview, users, taxonomy, moderation, analytics, requests, visitors, ops
+    api/            # auth, cart, ratings, orders, products, payment-methods, settings, reports, tickets, disputes, visits, admin/*
+    api/auth/[...all]/ # BetterAuth handler via toNextJsHandler
   components/
-    Layout/         # Header, ThemeToggleButton
+    Admin/          # AdminMenu button, UserManager, TaxonomyManager, ModerationQueue, AnalyticsCharts, RequestBoards, VisitorTable, OpsManager
+    Auth/           # SignInForm, SignUpForm with role picker, SocialButtons, UserMenu with profile
+    Layout/         # DockNav floating dock with cart, ThemeToggler circle reveal
     Providers/      # ThemeProvider (next-themes)
-    shadcnui/       # shadcn primitives (button.tsx, toast.tsx)
+    Profile/        # ProfileForm URL avatar, UpgradeSellerButton
+    Seller/         # SellerDashboard, ProductForm with image URL, MethodForm
+    Settings/       # SettingsForm currency plus payment method
+    Shop/           # ProductCatalog with image URLs, CartDrawer, RateForm, ReportButton, DisputeButton, TicketForm
+    shadcnui/       # shadcn primitives (button, card, chart, input, label, field, alert, avatar, badge, dropdown-menu, separator, spinner, tooltip, toast, dock, animated-theme-toggler)
   hooks/            # Custom hooks (currently empty)
   lib/
+    auth.ts         # BetterAuth server config, admin plugin buyer default, nextCookies last
+    auth-client.ts  # BetterAuth client with adminClient
     dbClient/       # Prisma singleton with libSQL adapter
     env/            # serverEnv.ts, clientEnv.ts (t3-env)
     fonts.ts        # next/font (Geist, Inter)
+    dates.ts        # date-fns formatDate plus timeAgo helpers
+    money.ts        # Client-safe currency convert plus format helpers
     types.ts        # LayoutProps
     utils.ts        # cn() helper (clsx + tailwind-merge)
-  server/           # API routes placeholder (empty)
+    zodSchema.ts    # Auth plus product, rating, cart, payment, settings, order schemas
+  server/           # get-session.ts, marketplace.ts guards, currency.ts live rates
+proxy.ts            # Optimistic session cookie guard for private routes
+prisma/seed.ts      # Seeds admin, buyer, seller plus 32 products plus rates
 generated/prisma/   # Prisma client output (gitignored)
 public/uploads/     # User uploads (all files ignored except .gitkeep)
 ```
@@ -84,6 +110,14 @@ public/uploads/     # User uploads (all files ignored except .gitkeep)
 
 - **Functions**: Always use arrow functions (`const foo = () => {}`), never `function` declarations. Exception: `src/components/shadcnui/` keeps its generated style.
 - **No em dashes**: Never use em dashes in prose, comments, or docs. Use periods or commas instead. Also avoid parentheses, en dashes, and hyphens as dash substitutes.
+- **Link buttons**: When a button must look like a link, use `Link` with `buttonVariants`. Example: `<Link href="#" className={buttonVariants({ variant: "secondary", size: "sm" })}>Login</Link>`.
+- **Dates**: Always use date-fns for time work via `src/lib/dates.ts` (`formatDate`, `timeAgo`). Never hand-roll date math or string building.
+
+## Test data cleanup
+
+- **Remove all test data after test complete**: delete throwaway users, sessions, accounts, and verification rows created during verification from `dev.db`.
+- **Remove playwright-cli test data after complete test**: delete `.playwright-cli/` snapshots, logs, and screenshots after verification.
+- **Seed logins for playwright-cli**: use `ADMIN_EMAIL` and `USER_EMAIL` from `prisma/seed.ts` and `.env` for login verification, never hardcode other credentials.
 
 ## Key restrictions
 

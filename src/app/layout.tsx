@@ -1,3 +1,5 @@
+import CartDrawer from "@/components/Shop/CartDrawer";
+import DockNav from "@/components/Layout/DockNav";
 import ThemeProvider from "@/components/Providers/ThemeProvider";
 import { geistMono, geistSans, interHeading } from "@/lib/fonts";
 import { LayoutProps } from "@/lib/types";
@@ -21,6 +23,8 @@ const RootLayout = ({ children }: LayoutProps) => {
           defaultTheme="dark"
           enableSystem={false}>
           {children}
+          <CartDrawer />
+          <DockNav />
         </ThemeProvider>
       </body>
     </html>
